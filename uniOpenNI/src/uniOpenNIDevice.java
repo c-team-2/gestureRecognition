@@ -1,7 +1,12 @@
 import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
 
 import org.OpenNI.*;
+
+import classifier.kinectData.JointPosition;
+import classifier.kinectData.SkeletonSnapshot;
 
 
 public class uniOpenNIDevice {
@@ -27,7 +32,12 @@ public class uniOpenNIDevice {
     int numUsers;
     int users[];
     HashMap<Integer, HashMap<SkeletonJoint, SkeletonJointPosition>> joints; //Integer is the User number
+    HashMap<Integer, List<SkeletonSnapshot>> snapshots;
     // End relevant data
+    
+    //Debug variables
+    private int debugCount = 0;
+    private int debugPrintCount = 10;
     
     private final String SAMPLE_XML_FILE = "SamplesConfig.xml";
     
@@ -53,6 +63,7 @@ public class uniOpenNIDevice {
 			
 			calibPose = skeletonCap.getSkeletonCalibrationPose();
 			joints = new HashMap<Integer, HashMap<SkeletonJoint,SkeletonJointPosition>>();
+			snapshots = new HashMap<Integer, List<SkeletonSnapshot>>();
 			
 			skeletonCap.setSkeletonProfile(SkeletonProfile.ALL);
 			
@@ -165,43 +176,56 @@ public class uniOpenNIDevice {
         }
     }
 	
-	public void getJoint(int user, SkeletonJoint joint) throws StatusException
+	public Point3D getJoint(int user, SkeletonJoint joint) throws StatusException
     {
         SkeletonJointPosition pos = skeletonCap.getSkeletonJointPosition(user, joint);
 		if (pos.getPosition().getZ() != 0)
 		{
 			HashMap<SkeletonJoint, SkeletonJointPosition> userjoints = joints.get(user);
+			
+			SkeletonJointPosition posProj = new SkeletonJointPosition(depthGen.convertRealWorldToProjective(pos.getPosition()), pos.getConfidence());
 			if(userjoints != null)
-				userjoints.put(joint, new SkeletonJointPosition(depthGen.convertRealWorldToProjective(pos.getPosition()), pos.getConfidence()));
+				userjoints.put(joint, posProj);
+			return posProj.getPosition(); //TODO not sure if pointer or value...
+				
 		}
 		else
 		{
 			joints.get(user).put(joint, new SkeletonJointPosition(new Point3D(), 0));
+			return new Point3D();
 		}
     }
 	
     public void getJoints(int user) throws StatusException
     {
-    	getJoint(user, SkeletonJoint.HEAD);
-    	getJoint(user, SkeletonJoint.NECK);
-    	
-    	getJoint(user, SkeletonJoint.LEFT_SHOULDER);
-    	getJoint(user, SkeletonJoint.LEFT_ELBOW);
-    	getJoint(user, SkeletonJoint.LEFT_HAND);
+		List<SkeletonSnapshot> userSnapshots = snapshots.get(user);
 
-    	getJoint(user, SkeletonJoint.RIGHT_SHOULDER);
-    	getJoint(user, SkeletonJoint.RIGHT_ELBOW);
-    	getJoint(user, SkeletonJoint.RIGHT_HAND);
-
-    	getJoint(user, SkeletonJoint.TORSO);
-
-    	getJoint(user, SkeletonJoint.LEFT_HIP);
-        getJoint(user, SkeletonJoint.LEFT_KNEE);
-        getJoint(user, SkeletonJoint.LEFT_FOOT);
-
-    	getJoint(user, SkeletonJoint.RIGHT_HIP);
-        getJoint(user, SkeletonJoint.RIGHT_KNEE);
-        getJoint(user, SkeletonJoint.RIGHT_FOOT);
+		if(userSnapshots != null){
+			userSnapshots.add(new SkeletonSnapshot(getJoint(user, SkeletonJoint.HEAD),
+						getJoint(user, SkeletonJoint.NECK),
+   
+				    	getJoint(user, SkeletonJoint.LEFT_SHOULDER),
+				    	getJoint(user, SkeletonJoint.LEFT_ELBOW),
+				    	getJoint(user, SkeletonJoint.LEFT_HAND),
+				
+				    	getJoint(user, SkeletonJoint.RIGHT_SHOULDER),
+				    	getJoint(user, SkeletonJoint.RIGHT_ELBOW),
+				    	getJoint(user, SkeletonJoint.RIGHT_HAND),
+				
+				    	getJoint(user, SkeletonJoint.TORSO),
+				
+				    	getJoint(user, SkeletonJoint.LEFT_HIP),
+				        getJoint(user, SkeletonJoint.LEFT_KNEE),
+				        getJoint(user, SkeletonJoint.LEFT_FOOT),
+				
+				    	getJoint(user, SkeletonJoint.RIGHT_HIP),
+				        getJoint(user, SkeletonJoint.RIGHT_KNEE),
+				        getJoint(user, SkeletonJoint.RIGHT_FOOT)));
+						
+			if(debugPrintCount == debugCount)
+				System.out.println(userSnapshots.get(userSnapshots.size() - 1));
+			debugCount++;
+		}
 
     }
     
@@ -253,6 +277,8 @@ public class uniOpenNIDevice {
 				System.out.println("starting tracking "  +args.getUser());
 					skeletonCap.startTracking(args.getUser());
 	                joints.put(new Integer(args.getUser()), new HashMap<SkeletonJoint, SkeletonJointPosition>());
+	                if(snapshots.get(args.getUser()) == null)
+	                	snapshots.put(new Integer(args.getUser()), new LinkedList<SkeletonSnapshot>());
 			}
 			else if (args.getStatus() != CalibrationProgressStatus.MANUAL_ABORT)
 			{
