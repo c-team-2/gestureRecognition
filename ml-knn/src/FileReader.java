@@ -35,8 +35,9 @@ public class FileReader {
             	  throw new Exception("Unknown number of attributes!");
               }
               
-              String sessionId = st.nextToken(); // the session Id for the client.  we only want to consider
+              //String sessionId = st.nextToken(); // the session Id for the client.  we only want to consider
               									 // classification for the same person (uuid) in the same session
+              String sessionId = "Session1";
               String uuid = st.nextToken(); // the actual person redeeming the coupon
               String os = st.nextToken(); // the OS that is running on the device
               String device = st.nextToken(); // the device the person is using

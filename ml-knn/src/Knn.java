@@ -14,6 +14,7 @@ public class Knn {
 	public static final int NUM_RUNS = 1000;
 	public static double averageDistance = 0;
 	
+	/*
 	public static void main(String[] args) {
 		ArrayList<Instance> instances = null;
 		ArrayList<Neighbor> distances = null;
@@ -61,6 +62,55 @@ public class Knn {
 		System.out.println("Recall: " + recall);
 		System.out.println("F-Measure: " + fMeasure);
 		System.out.println("Average distance: " + (double)(averageDistance / (double)(NUM_RUNS * K)));
+	}*/
+	
+	public static void runKNN() {
+		ArrayList<Instance> instances = null;
+		ArrayList<Neighbor> distances = null;
+		ArrayList<Neighbor> neighbors = null;
+		WSAction.Action classification = null;
+		Instance classificationInstance = null;
+		FileReader reader = null;
+		int numRuns = 0, truePositives = 0, falsePositives = 0, falseNegatives = 0, trueNegatives = 0;
+		double precision = 0, recall = 0, fMeasure = 0;
+		
+		falsePositives = 1;
+		
+		reader = new FileReader(PATH_TO_DATA_FILE);
+		instances = reader.buildInstances();
+		
+		do {
+			classificationInstance = extractIndividualInstance(instances);
+			
+			distances = calculateDistances(instances, classificationInstance);
+			neighbors = getNearestNeighbors(distances);
+			classification = determineMajority(neighbors);
+			
+			System.out.println("Gathering " + K + " nearest neighbors to:");
+			printClassificationInstance(classificationInstance);
+			
+			printNeighbors(neighbors);
+			System.out.println("\nExpected situation result for instance: " + classification.toString());
+			
+			if(classification.toString().equals(((WSAction)classificationInstance.getAttributes().get(WSACTION_INDEX)).getAction().toString())) {
+				truePositives++;
+			}
+			else {
+				falseNegatives++;
+			}
+			numRuns++;
+			
+			instances.add(classificationInstance);
+		} while(numRuns < NUM_RUNS);
+		
+		precision = ((double)(truePositives / (double)(truePositives + falsePositives)));
+		recall = ((double)(truePositives / (double)(truePositives + falseNegatives)));
+		fMeasure = ((double)(precision * recall) / (double)(precision + recall));
+		
+		System.out.println("Precision: " + precision);
+		System.out.println("Recall: " + recall);
+		System.out.println("F-Measure: " + fMeasure);
+		System.out.println("Average distance: " + (double)(averageDistance / (double)(NUM_RUNS * K)));	
 	}
 	
 	public static Instance extractIndividualInstance(ArrayList<Instance> instances) {
