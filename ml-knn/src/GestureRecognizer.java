@@ -1,42 +1,47 @@
-import javax.swing.SwingUtilities;
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Graphics;
-import java.awt.Rectangle;
+/**************************************************************
+This file is part of Kinect Sensor Architecture Development Project.
 
-import javax.swing.JPanel;
-import javax.swing.JFrame;
-import javax.swing.JButton;
+   Kinect Sensor Architecture Development Project is free software:
+you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   Kinect Sensor Architecture Development Project is distributed in
+the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with Kinect Sensor Architecture Development Project.  If
+not, see <http://www.gnu.org/licenses/>.
+**************************************************************/
+/**************************************************************
+The work was done in joint collaboration with Cisco Systems Inc.
+Copyright © 2012, Cisco Systems, Inc. and UCLA
+*************************************************************/
 
 import java.awt.Dimension;
-import java.awt.color.ColorSpace;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
-import java.awt.image.BufferedImage;
-import java.awt.image.ColorModel;
-import java.awt.image.ComponentColorModel;
-import java.awt.image.DataBuffer;
-import java.awt.image.DataBufferByte;
-import java.awt.image.Raster;
-import java.awt.image.WritableRaster;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.awt.GridBagLayout;
+import java.awt.Font;
+import java.awt.Rectangle;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.LinkedList;
 
+import javax.swing.JButton;
+import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JPanel;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 
 /**
  * 
@@ -54,7 +59,7 @@ public class GestureRecognizer extends JFrame {
 	private JButton jButton_end = null;
 	private boolean continueReadData = false; //flag that allows to connect to the sensor unless user presses the END button
 	private boolean startCapture = false; //flag that indicates to start capturing the sensor data
-	private static int NUM_FEATURES = 12;
+	private static int NUM_FEATURES = 16;
 	private Sensor kinect;
 	private LinkedList<SensorSnapshot> snapshots;
 	private JButton jButton = null;
@@ -78,6 +83,10 @@ public class GestureRecognizer extends JFrame {
 	private JLabel jLabel2 = null;
 	private JTextField jTextField_gesture = null;
 	private JTextArea jTextArea_Comment = null;
+	private JLabel jLabel3 = null;
+	private JTextField jTextField_confidence = null;
+	private GestureRecognitionApplet gesRecApplet = null;
+	
 	/**
 	 * This method initializes jButton_start	
 	 * 	jButton_start will indicate the start of the gesture performance event
@@ -107,6 +116,9 @@ public class GestureRecognizer extends JFrame {
 					    		System.out.println(snapshot.getChannelName());
 					    		
 					    		Channel user1Channel = snapshot.getChannel("User1");
+					    		
+					    		gesRecApplet.Update(snapshot);
+					    		
 								//getting the skeleton data
 						    	if (user1Channel != null)
 						    	{
@@ -222,7 +234,7 @@ public class GestureRecognizer extends JFrame {
 					{
 						try 
 						{
-							File file = new File("bodytilt_trial_10.txt");
+							File file = new File("kick_trial_10.txt");
 							BufferedWriter output = new BufferedWriter(new FileWriter(file));
 							//DataOutputStream output = new DataOutputStream(new FileOutputStream("handwave_trial_01.txt"));
 							
@@ -242,6 +254,15 @@ public class GestureRecognizer extends JFrame {
 						    	output.write("\n");
 							}
 							output.close();
+							
+							float[] featureMatrix = new float[NUM_FEATURES];					
+							featureMatrix = featureExtraction(rawSensorDataMatrix);
+							
+							System.out.println("-------------------\n");
+							System.out.println(String.valueOf(featureMatrix[6]) + " " + String.valueOf(featureMatrix[7]) + " " + 
+									String.valueOf(featureMatrix[8]));
+							System.out.println(String.valueOf(featureMatrix[14]) + " " + String.valueOf(featureMatrix[15]));
+							System.out.println(String.valueOf(featureMatrix[0]) + " " + String.valueOf(featureMatrix[1]));
 						}
 						catch (IOException ioe)
 						{
@@ -272,16 +293,23 @@ public class GestureRecognizer extends JFrame {
 						}
 						else if (result_gesture.label == 2)
 						{
-							//Body tilt detected
+							//Puch detected
+							getJTextArea_Comment().setText("Please don't punch me!!");
+							getJTextField_gesture().setText("Punch");
 						}
 						else if (result_gesture.label == 3)
 						{
 							//Body tilt detected
+							getJTextArea_Comment().setText("You are a bad person!!");
+							getJTextField_gesture().setText("Kick");
 						}
 						else
 						{
 							//recognition error
+							getJTextArea_Comment().setText("I don't know what you are doing!!");
+							getJTextField_gesture().setText("Not Recognized");
 						}
+						getJTextField_confidence().setText(String.valueOf(result_gesture.confidence));
 					}
 					
 					//clear the linked list
@@ -327,10 +355,14 @@ public class GestureRecognizer extends JFrame {
 		float[] rightShoulderY = new float[sensorMatrixSize];
 		float[] rightHandX = new float[sensorMatrixSize];
 		float[] rightHandY = new float[sensorMatrixSize];
+		float[] rightHandZ = new float[sensorMatrixSize];
 		float[] leftShoulderX = new float[sensorMatrixSize];
 		float[] leftShoulderY = new float[sensorMatrixSize];
 		float[] leftHandX = new float[sensorMatrixSize];
 		float[] leftHandY = new float[sensorMatrixSize];
+		float[] leftHandZ = new float[sensorMatrixSize];
+		float[] rightFootY = new float[sensorMatrixSize];
+		float[] rightFootZ = new float[sensorMatrixSize];
 		
 		
 		for (int dataSampleIdx = 0; dataSampleIdx < sensorMatrixSize; dataSampleIdx++){
@@ -342,10 +374,15 @@ public class GestureRecognizer extends JFrame {
 			rightShoulderY[dataSampleIdx] = rawSensorDataMatrix[dataSampleIdx][5][1];
 			rightHandX[dataSampleIdx] = rawSensorDataMatrix[dataSampleIdx][7][0];
 			rightHandY[dataSampleIdx] = rawSensorDataMatrix[dataSampleIdx][7][1];
+			rightHandZ[dataSampleIdx] = rawSensorDataMatrix[dataSampleIdx][7][2];
 			leftShoulderX[dataSampleIdx] = rawSensorDataMatrix[dataSampleIdx][2][0];
 			leftShoulderY[dataSampleIdx] = rawSensorDataMatrix[dataSampleIdx][2][1];
 			leftHandX[dataSampleIdx] = rawSensorDataMatrix[dataSampleIdx][4][0];
 			leftHandY[dataSampleIdx] = rawSensorDataMatrix[dataSampleIdx][4][1];
+			leftHandZ[dataSampleIdx] = rawSensorDataMatrix[dataSampleIdx][4][2];
+			rightFootY[dataSampleIdx] = rawSensorDataMatrix[dataSampleIdx][14][1];
+			rightFootZ[dataSampleIdx] = rawSensorDataMatrix[dataSampleIdx][14][2];
+			
 		}
 		
 		featureMatrix[0] = computeStdDev(headX);
@@ -353,15 +390,20 @@ public class GestureRecognizer extends JFrame {
 		featureMatrix[2] = computeStdDev(midTorsoX);
 		featureMatrix[3] = computeStdDev(midTorsoY);
 		
-		featureMatrix[0] = computeStdDev(rightShoulderX);
-		featureMatrix[1] = computeStdDev(rightShoulderY);
-		featureMatrix[2] = computeStdDev(rightHandX);
-		featureMatrix[3] = computeStdDev(rightHandX);
+		featureMatrix[4] = computeStdDev(rightShoulderX);
+		featureMatrix[5] = computeStdDev(rightShoulderY);
+		featureMatrix[6] = computeStdDev(rightHandX);
+		featureMatrix[7] = computeStdDev(rightHandY);
+		featureMatrix[8] = computeStdDev(rightHandZ);
 		
-		featureMatrix[0] = computeStdDev(leftShoulderX);
-		featureMatrix[1] = computeStdDev(leftShoulderY);
-		featureMatrix[2] = computeStdDev(leftShoulderX);
-		featureMatrix[3] = computeStdDev(leftShoulderY);
+		featureMatrix[9] = computeStdDev(leftShoulderX);
+		featureMatrix[10] = computeStdDev(leftShoulderY);
+		featureMatrix[11] = computeStdDev(leftHandX);
+		featureMatrix[12] = computeStdDev(leftHandY);
+		featureMatrix[13] = computeStdDev(leftHandZ);
+		
+		featureMatrix[14] = computeStdDev(rightFootY);
+		featureMatrix[15] = computeStdDev(rightFootZ);
 		
 		return featureMatrix;
 	}
@@ -514,9 +556,23 @@ public class GestureRecognizer extends JFrame {
 	private JTextArea getJTextArea_Comment() {
 		if (jTextArea_Comment == null) {
 			jTextArea_Comment = new JTextArea();
-			jTextArea_Comment.setBounds(new Rectangle(219, 136, 277, 98));
+			jTextArea_Comment.setBounds(new Rectangle(217, 166, 279, 68));
+			jTextArea_Comment.setFont(new Font(getName(), Font.BOLD, 22));
 		}
 		return jTextArea_Comment;
+	}
+
+	/**
+	 * This method initializes jTextField_confidence	
+	 * 	
+	 * @return javax.swing.JTextField	
+	 */
+	private JTextField getJTextField_confidence() {
+		if (jTextField_confidence == null) {
+			jTextField_confidence = new JTextField();
+			jTextField_confidence.setBounds(new Rectangle(386, 136, 111, 19));
+		}
+		return jTextField_confidence;
 	}
 
 	/**
@@ -545,6 +601,8 @@ public class GestureRecognizer extends JFrame {
 		kinect = new Sensor(device);
 		snapshots = new LinkedList<SensorSnapshot>();
 		
+		gesRecApplet = new GestureRecognitionApplet();
+		
 		//read training data
 		readTrainingData();
 	}
@@ -559,15 +617,24 @@ public class GestureRecognizer extends JFrame {
 		System.out.println("Loading Training Data...\n");
 		
 		//read features for Handwave gesture
-		String dir_path = "/home/sunghoon/workspace/GestureRecognitionSystem/handwave/";		
+		String dir_path = "handwave/";		
 		float[][] featureMatrix_Handwave = readGestureFile(dir_path);
 		
 		//read features for Bodytilt gesture
-		dir_path = "/home/sunghoon/workspace/GestureRecognitionSystem/bodytilt/";		
+		dir_path = "bodytilt/";		
 		float[][] featureMatrix_Bodytilt = readGestureFile(dir_path);
 		
+		//read features for Bodytilt punch
+		dir_path = "punch/";		
+		float[][] featureMatrix_Punch = readGestureFile(dir_path);
+		
+		//read features for Bodytilt kick
+		dir_path = "kick/";		
+		float[][] featureMatrix_Kick = readGestureFile(dir_path);
+		
 		//now combine all the gestures
-		totalTrainingSize = featureMatrix_Handwave.length + featureMatrix_Bodytilt.length;
+		totalTrainingSize = featureMatrix_Handwave.length + featureMatrix_Bodytilt.length + 
+			featureMatrix_Punch.length + featureMatrix_Kick.length;
 		
 		//Now we know the size of the total feature matrix.
 		trainingFeatures = new float[totalTrainingSize][NUM_FEATURES];
@@ -590,6 +657,24 @@ public class GestureRecognizer extends JFrame {
 			trainingLabels[idxSample] = 1;
 		}
 		idxOffSet = featureMatrix_Handwave.length + featureMatrix_Bodytilt.length;
+		
+		//Copying bodytilt feature into the main feature matrix
+		for (int idxSample = idxOffSet; idxSample < idxOffSet + featureMatrix_Punch.length; idxSample++)
+		{
+			for (int idxFeature = 0; idxFeature < NUM_FEATURES; idxFeature++)
+				trainingFeatures[idxSample][idxFeature] = featureMatrix_Punch[idxSample-idxOffSet][idxFeature];
+			trainingLabels[idxSample] = 2;
+		}
+		idxOffSet = featureMatrix_Handwave.length + featureMatrix_Bodytilt.length + featureMatrix_Punch.length;
+		
+		//Copying bodytilt feature into the main feature matrix
+		for (int idxSample = idxOffSet; idxSample < idxOffSet + featureMatrix_Kick.length; idxSample++)
+		{
+			for (int idxFeature = 0; idxFeature < NUM_FEATURES; idxFeature++)
+				trainingFeatures[idxSample][idxFeature] = featureMatrix_Kick[idxSample-idxOffSet][idxFeature];
+			trainingLabels[idxSample] = 3;
+		}
+		idxOffSet = featureMatrix_Handwave.length + featureMatrix_Bodytilt.length + featureMatrix_Punch.length  + featureMatrix_Kick.length;
 		
 		
 		System.out.println("Loading Completed!\n");
@@ -762,6 +847,7 @@ public class GestureRecognizer extends JFrame {
 
 	/**
 	 * This method initializes the main frame
+	 * Sets the size and creates the view
 	 * 
 	 * @return void
 	 */
@@ -778,16 +864,19 @@ public class GestureRecognizer extends JFrame {
 	 */
 	private JPanel getJContentPane() {
 		if (jContentPane == null) {
-		jLabel2 = new JLabel();
-		jLabel2.setBounds(new Rectangle(216, 107, 146, 14));
-		jLabel2.setText("Recognized Gesture");
-		jLabel1 = new JLabel();
-		jLabel1.setBounds(new Rectangle(465, 12, 43, 15));
-		jLabel1.setText("Z");
-		jLabel = new JLabel();
-		jLabel.setBounds(new Rectangle(210, 67, 76, 15));
-		jLabel.setText("Right Foot");
-		jLabel15 = new JLabel();
+			jLabel3 = new JLabel();
+			jLabel3.setBounds(new Rectangle(217, 135, 145, 15));
+			jLabel3.setText("Confidence Level");
+			jLabel2 = new JLabel();
+			jLabel2.setBounds(new Rectangle(216, 107, 146, 14));
+			jLabel2.setText("Recognized Gesture");
+			jLabel1 = new JLabel();
+			jLabel1.setBounds(new Rectangle(465, 12, 43, 15));
+			jLabel1.setText("Z");
+			jLabel = new JLabel();
+			jLabel.setBounds(new Rectangle(210, 67, 76, 15));
+			jLabel.setText("Right Foot");
+			jLabel15 = new JLabel();
 			jLabel15.setBounds(new Rectangle(396, 11, 19, 15));
 			jLabel15.setText("Y");
 			jLabel14 = new JLabel();
@@ -804,10 +893,8 @@ public class GestureRecognizer extends JFrame {
 			jContentPane.add(getJButton_start(), null);
 			jContentPane.add(getJButton_end(), null);
 			
-			ImagePanel skeletonImagePanel = new ImagePanel();  
 	        // add graphic component to center of this  
 	        // JFrames (default) BorderLayout  
-			jContentPane.add(skeletonImagePanel, null);  
 			jContentPane.add(getJButton(), null);
 			jContentPane.add(jLabel_skeleton_head, null);
 			jContentPane.add(getJTextArea_Head_X(), null);
@@ -823,195 +910,13 @@ public class GestureRecognizer extends JFrame {
 			jContentPane.add(jLabel2, null);
 			jContentPane.add(getJTextField_gesture(), null);
 			jContentPane.add(getJTextArea_Comment(), null);
+			jContentPane.add(jLabel3, null);
+			jContentPane.add(getJTextField_confidence(), null);
 			
 		}
 		return jContentPane;
 	}
 }  //  @jve:decl-index=0:visual-constraint="10,10"
-
-class ImagePanel extends JPanel{
-
-    private BufferedImage image;
-    private static final long serialVersionUID = 1L;
-    private byte[] imgbytes;
-    private float histogram[];
-    HashMap<Integer, HashMap<Integer, float[]>> joints;
-
-    private boolean drawBackground = true;
-    private boolean drawPixels = true;
-    private boolean drawSkeleton = true;    
-    
-    private BufferedImage bimg;
-    int width, height;
-    double sizeFactor = 1;
-
-    public ImagePanel() {           
-          //image = ImageIO.read(new File("image name and path"));
-    	histogram = new float[10000];
-        width = 800;
-        height = 800;
-        sizeFactor = 0.5;
-        imgbytes = new byte[width*height*3];
-        joints = new HashMap<Integer, HashMap<Integer, float[]>>();
-    }
-
-    @Override
-    public void paintComponent(Graphics g) {
-    	paint(g);
-        g.drawImage(bimg, 0, 0, null); // see javadoc for more info on the parameters
-    }
-    
-    private void calcHist(Channel depth)
-    {
-        // reset
-        for (int i = 0; i < histogram.length; ++i)
-            histogram[i] = 0;
-
-        int points = 0;
-        int depthIterator = 0;
-        while(depthIterator < depth.getNumberOfTuples())
-        {
-            short depthVal = depth.getTuple(depthIterator++).getElementShort(0);
-            if (depthVal != 0)
-            {
-                histogram[depthVal]++;
-                points++;
-            }
-        }
-        
-        for (int i = 1; i < histogram.length; i++)
-        {
-            histogram[i] += histogram[i-1];
-        }
-
-        if (points > 0)
-        {
-            for (int i = 1; i < histogram.length; i++)
-            {
-                histogram[i] = 1.0f - (histogram[i] / (float)points);
-            }
-        }
-    }
-    
-    public void updateJoints(SensorSnapshot snapshot)
-    {
-    	Channel user1Channel = snapshot.getChannel("User1");
-    	if (user1Channel != null)
-    	{
-    		HashMap<Integer, float[]> user1Skeleton = new HashMap<Integer, float[]>();	
-	    	for (int jointIndex = 0; jointIndex < 15; ++jointIndex)
-	    	{
-	    		float[] coordsAndConf = new float[4]; // coordinates (x, y, z) and confidence
-	    		coordsAndConf[0] = user1Channel.getTuple(jointIndex).getElementFloat(0);
-	    		coordsAndConf[1] = user1Channel.getTuple(jointIndex).getElementFloat(1);
-	    		coordsAndConf[2] = user1Channel.getTuple(jointIndex).getElementFloat(2);
-	    		coordsAndConf[3] = user1Channel.getTuple(jointIndex).getElementFloat(3);
-	    		
-	    		user1Skeleton.put(jointIndex, coordsAndConf);
-	    	}
-	    	joints.put(1, user1Skeleton);
-    	}
-    }
-
-    Color colors[] = {Color.RED, Color.BLUE, Color.CYAN, Color.GREEN, Color.MAGENTA, Color.PINK, Color.YELLOW, Color.WHITE};
-
-    void drawLine(Graphics g, HashMap<Integer, float[]> dict, int i, int j)
-    {
-		float[] pos1 = dict.get(i);
-		float[] pos2 = dict.get(j);
-
-		if (pos1 != null && pos2 != null) 
-		{
-			if (pos1[3] == 0 || pos2[3] == 0)
-				return;
-	
-			g.drawLine((int)(sizeFactor*pos1[0]), (int)(height - sizeFactor*pos1[1]), (int)(sizeFactor*pos2[0]), (int)(height - sizeFactor*pos2[1]));
-		}
-    }
-    
-    public void drawSkeleton(Graphics g, int user) //throws StatusException
-    {
-    	HashMap<Integer, float[]> dict = joints.get(new Integer(user));
-
-    	if (dict != null)
-    	{
-    		/*
-    		 0 = head
-    		 1 = neck
-    		 2 = left shoulder 
-    		 3 = left elbow
-    		 4 = left hand
-    		 5 = right shoulder
-    		 6 = right elbow
-    		 7 = right hand
-    		 8 = middle torso
-    		 9 = left pelvis
-    		 10 = left knee
-    		 11 = left foot
-    		 12 = right pelvis
-    		 13 = right knee
-    		 14 = right foot
-    		 */
-	    	drawLine(g, dict, 0, 1); //head
-	
-	    	drawLine(g, dict, 2, 8); //left shoulder - middle torso
-	    	drawLine(g, dict, 5, 8);
-	
-	    	drawLine(g, dict, 1, 2);
-	    	drawLine(g, dict, 2, 3);
-	    	drawLine(g, dict, 3, 4);
-	
-	    	drawLine(g, dict, 2, 5);
-	    	drawLine(g, dict, 5, 6);
-	    	drawLine(g, dict, 6, 7);
-	
-	    	drawLine(g, dict, 9, 8);
-	    	drawLine(g, dict, 12, 8);
-	    	drawLine(g, dict, 9, 12);
-    		//user1Skeleton.put(jointIndex, coordsAndConf);
-
-	    	drawLine(g, dict, 9, 10);
-	    	drawLine(g, dict, 10, 11);
-	
-	    	drawLine(g, dict, 12, 13);
-	    	drawLine(g, dict, 13, 14);
-    	}
-
-    }
-    
-    public void paint(Graphics g)
-    {
-    	if (drawPixels)
-    	{
-            DataBufferByte dataBuffer = new DataBufferByte(imgbytes, width*height*3);
-
-            WritableRaster raster = Raster.createInterleavedRaster(dataBuffer, width, height, width * 3, 3, new int[]{0, 1, 2}, null); 
-
-            ColorModel colorModel = new ComponentColorModel(ColorSpace.getInstance(ColorSpace.CS_sRGB), new int[]{8, 8, 8}, false, false, ComponentColorModel.OPAQUE, DataBuffer.TYPE_BYTE);
-
-            bimg = new BufferedImage(colorModel, raster, false, null);
-
-    		g.drawImage(bimg, 0, 0, null);
-    	}
-    	
-		int[] users = {1};
-		for (int i = 0; i < users.length; ++i)
-		{
-	    	Color c = colors[users[i]%colors.length];
-	    	c = new Color(255-c.getRed(), 255-c.getGreen(), 255-c.getBlue());
-
-	    	g.setColor(c);
-	    	if (drawSkeleton)
-			{
-				drawSkeleton(g, users[i]);
-			}
-		}
-    }
-    
-    public Dimension getPreferredSize() {
-        return new Dimension(width, height);
-    }
-}
 
 class Distance {
     float d;
